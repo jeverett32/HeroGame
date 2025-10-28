@@ -70,11 +70,12 @@ public class HeroGame extends JFrame {
     }
 
     public void loadGame() {
-        if (gamePanel.loadGame()) {
-            cardLayout.show(mainPanel, "GAME");
-            this.currentScreen = "GAME"; // Update the current screen state
-            gamePanel.requestFocusInWindow(); // Request focus for key events
-        }
+    // Start loading asynchronously to avoid freezing the UI. Switch to the game card immediately
+    // so the user sees progress and the loaded state when it completes.
+    gamePanel.loadGameAsync();
+    cardLayout.show(mainPanel, "GAME");
+    this.currentScreen = "GAME";
+    gamePanel.requestFocusInWindow();
     }
 
     // New method to handle prompting the user before quitting
