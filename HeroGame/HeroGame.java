@@ -8,6 +8,8 @@ import java.io.IOException;
  * This class initializes the game window and starts the game.
  */
 
+// A comment for testing git
+
 public class HeroGame extends JFrame {
     private CardLayout cardLayout; // CardLayout for switching between game states
     private JPanel mainPanel;
