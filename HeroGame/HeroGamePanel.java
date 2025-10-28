@@ -236,52 +236,96 @@ class HeroGamePanel extends JPanel implements Runnable {
         if (!savesDir.exists()) {
             savesDir.mkdirs(); // This creates the directory if it's missing
         }
+        // Keep the old synchronous loader for API compatibility, but implement a safer async loader below.
         JFileChooser fileChooser = new JFileChooser(savesDir);
         if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            java.io.File file = fileChooser.getSelectedFile();
-            try (java.io.ObjectInputStream ois = new java.io.ObjectInputStream(new java.io.FileInputStream(file))) {
-                GameStateData data = (GameStateData) ois.readObject();
+            final java.io.File file = fileChooser.getSelectedFile();
 
-                this.heroX = data.heroX;
-                this.heroY = data.heroY;
-                this.heroLevel = data.heroLevel;
-                this.heroXP = data.heroXP;
-                this.xpToNextLevel = data.xpToNextLevel;
-                this.heroHealth = data.heroHealth; // FIXED: Load hero health
-                this.heroMaxHealth = data.heroMaxHealth; // FIXED: Load hero max health
-                this.coinCount = data.coinCount; // FIXED: Load coin count
-                this.enemies = data.enemies;
-                this.rocks = data.rocks;
-                this.stumps = data.stumps;
-                this.coins = data.coins; // FIXED: Load coins
-                this.foods = data.foods; // FIXED: Load foods
-                this.attackLevel = data.attackLevel;
-                this.defenseLevel = data.defenseLevel;
-                this.evasivenessLevel = data.evasivenessLevel;
-                this.healthUpgradeLevel = data.healthUpgradeLevel;
-                this.currentGameState = data.currentGameState;
-                if (this.currentGameState == null) {
-                    this.currentGameState = GameState.NORMAL;
-                }
-                this.level20EnemiesDefeated = data.level20EnemiesDefeated;
-                this.cameraX = data.cameraX; // FIXED: Load camera position
-                this.cameraY = data.cameraY; // FIXED: Load camera position
+            // Show a small non-blocking loading dialog while we deserialize off the EDT
+            final JDialog loadingDialog = new JDialog(SwingUtilities.getWindowAncestor(this), "Loading...", Dialog.ModalityType.MODELESS);
+            JProgressBar bar = new JProgressBar();
+            bar.setIndeterminate(true);
+            bar.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
+            loadingDialog.getContentPane().add(bar);
+            loadingDialog.pack();
+            loadingDialog.setLocationRelativeTo(this);
 
-                // Re-connect the transient panel field for each loaded enemy
-                for (Enemy enemy : enemies) {
-                    enemy.panel = this; // Reassign the panel reference
+            Thread loader = new Thread(() -> {
+                try (java.io.ObjectInputStream ois = new java.io.ObjectInputStream(new java.io.FileInputStream(file))) {
+                    GameStateData data = (GameStateData) ois.readObject();
+
+                    // Defensive defaults for missing fields in older saves
+                    List<Enemy> loadedEnemies = (data.enemies != null) ? data.enemies : new ArrayList<Enemy>();
+                    List<Point> loadedRocks = (data.rocks != null) ? data.rocks : new ArrayList<Point>();
+                    List<Point> loadedStumps = (data.stumps != null) ? data.stumps : new ArrayList<Point>();
+                    List<Point> loadedCoins = (data.coins != null) ? data.coins : new ArrayList<Point>();
+                    List<Point> loadedFoods = (data.foods != null) ? data.foods : new ArrayList<Point>();
+                    HeroGamePanel.GameState loadedState = (data.currentGameState != null) ? data.currentGameState : GameState.NORMAL;
+
+                    // Apply loaded state back on the EDT
+                    SwingUtilities.invokeLater(() -> {
+                        this.heroX = data.heroX;
+                        this.heroY = data.heroY;
+                        this.heroLevel = data.heroLevel;
+                        this.heroXP = data.heroXP;
+                        this.xpToNextLevel = data.xpToNextLevel;
+                        this.heroHealth = data.heroHealth;
+                        this.heroMaxHealth = data.heroMaxHealth;
+                        this.coinCount = data.coinCount;
+
+                        this.enemies = loadedEnemies;
+                        this.rocks = loadedRocks;
+                        this.stumps = loadedStumps;
+                        this.coins = loadedCoins;
+                        this.foods = loadedFoods;
+
+                        this.attackLevel = data.attackLevel;
+                        this.defenseLevel = data.defenseLevel;
+                        this.evasivenessLevel = data.evasivenessLevel;
+                        this.healthUpgradeLevel = data.healthUpgradeLevel;
+                        this.currentGameState = loadedState;
+                        this.level20EnemiesDefeated = data.level20EnemiesDefeated;
+                        this.cameraX = data.cameraX;
+                        this.cameraY = data.cameraY;
+
+                        // Reconnect transient fields
+                        for (Enemy enemy : enemies) {
+                            enemy.panel = this;
+                        }
+
+                        activeMessages.clear();
+                        updateCamera();
+                        repaint();
+                        loadingDialog.dispose();
+                    });
+
+                } catch (IOException | ClassNotFoundException e) {
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(this, "Error loading game file!", "Error", JOptionPane.ERROR_MESSAGE);
+                        loadingDialog.dispose();
+                    });
+                    e.printStackTrace();
                 }
-                
-                activeMessages.clear();
-                updateCamera();
-                repaint();
-                return true;
-            } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
-                JOptionPane.showMessageDialog(this, "Error loading game file!", "Error", JOptionPane.ERROR_MESSAGE);
-            }
+            }, "SaveFileLoader");
+
+            // Show the dialog and start loader thread
+            loadingDialog.setVisible(true);
+            loader.start();
+
+            // We return true here because the user selected a file and load has started.
+            // The actual completion happens asynchronously.
+            return true;
         }
         return false;
+    }
+
+    /**
+     * New async entry point for loading that callers can use when they don't need an immediate boolean result.
+     * This keeps the UI responsive while heavy deserialization happens off the EDT.
+     */
+    public void loadGameAsync() {
+        // Reuse existing synchronous entrypoint which we've implemented to start a background loader.
+        loadGame();
     }
 
     // --- Game Logic Methods ---
@@ -561,21 +605,9 @@ class HeroGamePanel extends JPanel implements Runnable {
 
         // --- World and Object Drawing ---
         g2d.translate(-cameraX + shakeOffsetX, -cameraY + shakeOffsetY);
-        // Draw the grass background
-        if (grassTexture != null) {
-            int textureWidth = grassTexture.getWidth() / 4;
-            int textureHeight = grassTexture.getHeight() / 4;
-            // Use nested loops to tile the image across the entire world
-            for (int y = 0; y < WORLD_HEIGHT; y += textureHeight) {
-                for (int x = 0; x < WORLD_WIDTH; x += textureWidth) {
-                    g2d.drawImage(grassTexture, x, y, null);
-                }
-            }
-        } else {
-            // Fallback to the solid color if the image failed to load
-            g2d.setColor(new Color(82, 100, 29));
-            g2d.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-        }
+        // Draw the background as a solid green color (do not use grass texture)
+        g2d.setColor(new Color(82, 100, 29));
+        g2d.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
         for (Point rockPos : rocks) {
             if (rockImage != null) g2d.drawImage(rockImage, rockPos.x, rockPos.y, UNIT_SIZE, UNIT_SIZE, null);
@@ -861,7 +893,7 @@ class HeroGamePanel extends JPanel implements Runnable {
 
                 nextX = (panel.random.nextInt(validWidthUnits) + 1) * UNIT_SIZE;
                 nextY = (panel.random.nextInt(validHeightUnits) + 1) * UNIT_SIZE;
-            } while (panel.isObstacle(this.x, this.y) || (this.x == panel.heroX && this.y == panel.heroY));
+            } while (panel.isObstacle(nextX, nextY) || (nextX == panel.heroX && nextY == panel.heroY));
 
             this.x = nextX;
             this.y = nextY;
