@@ -212,9 +212,7 @@ class HeroGamePanel extends JPanel implements Runnable {
         data.currentGameState = this.currentGameState;
         data.level20EnemiesDefeated = this.level20EnemiesDefeated;
         data.cameraX = this.cameraX;
-        data.cameraY = this.cameraY;
-
-        java.io.File savesDir = new java.io.File("HeroGame/saves");
+        java.io.File savesDir = new java.io.File("saves");
         if (!savesDir.exists()) {
             savesDir.mkdirs(); // This creates the directory if it's missing
         }
@@ -232,7 +230,7 @@ class HeroGamePanel extends JPanel implements Runnable {
     }
 
     public boolean loadGame() {
-        java.io.File savesDir = new java.io.File("HeroGame/saves");
+        java.io.File savesDir = new java.io.File("saves");
         if (!savesDir.exists()) {
             savesDir.mkdirs(); // This creates the directory if it's missing
         }

@@ -19,7 +19,7 @@ public class HeroGame extends JFrame {
 
 
     public HeroGame() {
-        setTitle("Donkey");
+        setTitle("Donkey v1.0.0 Beta");
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setResizable(true);
 
