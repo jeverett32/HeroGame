@@ -5,10 +5,10 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 
 public class TitlePanel extends JPanel {
-    private HeroGame game;
+    private DonkeyGame game;
     private BufferedImage backgroundImage;
 
-    public TitlePanel(HeroGame game) {
+    public TitlePanel(DonkeyGame game) {
         this.game = game;
 
         // Load the background image

@@ -10,15 +10,15 @@ import java.io.IOException;
 
 // A comment for testing git
 
-public class HeroGame extends JFrame {
+public class DonkeyGame extends JFrame {
     private CardLayout cardLayout; // CardLayout for switching between game states
     private JPanel mainPanel;
     private TitlePanel titlePanel;
-    private HeroGamePanel gamePanel;
+    private DonkeyGamePanel gamePanel;
     private String currentScreen = "";
 
 
-    public HeroGame() {
+    public DonkeyGame() {
         setTitle("Donkey v1.0.0 Beta");
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setResizable(true);
@@ -36,7 +36,7 @@ public class HeroGame extends JFrame {
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
 
-        gamePanel = new HeroGamePanel(this); // Pass a reference to this frame
+        gamePanel = new DonkeyGamePanel(this); // Pass a reference to this frame
         titlePanel = new TitlePanel(this); // Create the title panel
 
 
@@ -107,7 +107,7 @@ public class HeroGame extends JFrame {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            HeroGame game = new HeroGame();
+            DonkeyGame game = new DonkeyGame();
             game.setVisible(true);
         });
     }

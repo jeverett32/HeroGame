@@ -1,6 +1,6 @@
-# HeroGame
+# DonkeyGame
 
-A Hero Game written in Java. A personal project.
+A Donkey Game written in Java. A personal project.
 
 In this game, you play as shrek, navigating an open world hunting down Donkeys who seek to destroy Shrek. You gain experience, find coins, gain levels and power ups as you seek to put an end to Donkey once and for all.
 
@@ -10,7 +10,7 @@ This is a simple 2D adventure game built with Java Swing. The player controls a 
 ## Installation Instructions
 1. Clone the repository: `git clone <repository-url>`
 2. Compile the Java source files: `javac *.java`
-3. Run the game: `java HeroGame`
+3. Run the game: `java DonkeyGame`
 
 ## Usage Examples
 - Use the arrow keys to move the hero.

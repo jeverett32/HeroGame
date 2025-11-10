@@ -23,12 +23,12 @@ public class GameStateData implements Serializable {
 
 
     // Add fields for game state
-    public HeroGamePanel.GameState currentGameState;
+    public DonkeyGamePanel.GameState currentGameState;
     public int level20EnemiesDefeated;
 
 
     // World data
-    public List<HeroGamePanel.Enemy> enemies;
+    public List<DonkeyGamePanel.Enemy> enemies;
     public List<Point> rocks;
     public List<Point> stumps;
     public List<Point> coins; // List of coin positions

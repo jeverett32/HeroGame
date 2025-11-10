@@ -10,8 +10,8 @@ import java.util.List;
 import java.util.Random;
 import java.io.Serializable;
 
-class HeroGamePanel extends JPanel implements Runnable {
-    private HeroGame game; // Reference to the main game frame
+class DonkeyGamePanel extends JPanel implements Runnable {
+    private DonkeyGame game; // Reference to the main game frame
     private static final long serialVersionUID = 1L;
 
     // Game constants
@@ -110,7 +110,7 @@ class HeroGamePanel extends JPanel implements Runnable {
     private final int FPS = 60;
 
     // Constructor
-    public HeroGamePanel(HeroGame game) {
+    public DonkeyGamePanel(DonkeyGame game) {
         this.game = game;
         this.random = new Random();
         this.setPreferredSize(new Dimension(NATIVE_SCREEN_WIDTH, NATIVE_SCREEN_HEIGHT));
@@ -825,9 +825,9 @@ class HeroGamePanel extends JPanel implements Runnable {
         private static final long serialVersionUID = 1L;
         int x, y, level, currentHealth, maxHealth;
 
-        private transient HeroGamePanel panel;
+        private transient DonkeyGamePanel panel;
 
-        Enemy(HeroGamePanel panel) {
+        Enemy(DonkeyGamePanel panel) {
             this.panel = panel;
             this.level = 0;
             respawn();
