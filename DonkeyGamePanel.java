@@ -83,6 +83,7 @@ class DonkeyGamePanel extends JPanel implements Runnable {
     // Images
     private BufferedImage heroImage;
     private BufferedImage enemyImage;
+    private BufferedImage bossImage;
     private BufferedImage rockImage;
     private BufferedImage stumpImage;
     private BufferedImage coinSpriteSheet;
@@ -258,7 +259,7 @@ class DonkeyGamePanel extends JPanel implements Runnable {
                     List<Point> loadedStumps = (data.stumps != null) ? data.stumps : new ArrayList<Point>();
                     List<Point> loadedCoins = (data.coins != null) ? data.coins : new ArrayList<Point>();
                     List<Point> loadedFoods = (data.foods != null) ? data.foods : new ArrayList<Point>();
-                    HeroGamePanel.GameState loadedState = (data.currentGameState != null) ? data.currentGameState : GameState.NORMAL;
+                    GameState loadedState = (data.currentGameState != null) ? data.currentGameState : GameState.NORMAL;
 
                     // Apply loaded state back on the EDT
                     SwingUtilities.invokeLater(() -> {
@@ -289,6 +290,16 @@ class DonkeyGamePanel extends JPanel implements Runnable {
                         // Reconnect transient fields
                         for (Enemy enemy : enemies) {
                             enemy.panel = this;
+                            // Compatibility for old saves
+                            if (enemy.size == 0) {
+                                enemy.size = UNIT_SIZE;
+                            }
+                            // Re-initialize transient image field
+                            if (enemy.level == 25) {
+                                enemy.image = bossImage;
+                            } else {
+                                enemy.image = enemyImage;
+                            }
                         }
 
                         activeMessages.clear();
@@ -332,6 +343,7 @@ class DonkeyGamePanel extends JPanel implements Runnable {
         try {
             heroImage = ImageIO.read(getClass().getResource("/resources/hero_image.png"));
             enemyImage = ImageIO.read(getClass().getResource("/resources/enemy_image.png"));
+            bossImage = ImageIO.read(getClass().getResource("/resources/boss.png"));
             rockImage = ImageIO.read(getClass().getResource("/resources/rock.png"));
             stumpImage = ImageIO.read(getClass().getResource("/resources/stump.png"));
             coinSpriteSheet = ImageIO.read(getClass().getResource("/resources/coin.png"));
@@ -413,11 +425,25 @@ class DonkeyGamePanel extends JPanel implements Runnable {
         return rocks.contains(target) || stumps.contains(target);
     }
 
+    private boolean isAreaOccupied(int x, int y, int size) {
+        int numUnits = size / UNIT_SIZE;
+        for (int i = 0; i < numUnits; i++) {
+            for (int j = 0; j < numUnits; j++) {
+                if (isObstacle(x + i * UNIT_SIZE, y + j * UNIT_SIZE)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public void checkCollisions() {
         // --- Enemy Collision ---
         Enemy collidedEnemy = null;
         for (Enemy enemy : enemies) {
-            if (heroX == enemy.x && heroY == enemy.y) {
+            Rectangle heroBounds = new Rectangle(heroX, heroY, UNIT_SIZE, UNIT_SIZE);
+            Rectangle enemyBounds = new Rectangle(enemy.x, enemy.y, enemy.size, enemy.size);
+            if (heroBounds.intersects(enemyBounds)) {
                 collidedEnemy = enemy;
                 break;
             }
@@ -614,7 +640,7 @@ class DonkeyGamePanel extends JPanel implements Runnable {
             if (stumpImage != null) g2d.drawImage(stumpImage, stumpPos.x, stumpPos.y, UNIT_SIZE, UNIT_SIZE, null);
         }
         for (Enemy enemy : enemies) {
-            if (enemyImage != null) g2d.drawImage(enemyImage, enemy.x, enemy.y, UNIT_SIZE, UNIT_SIZE, null);
+            if (enemy.image != null) g2d.drawImage(enemy.image, enemy.x, enemy.y, enemy.size, enemy.size, null);
             drawEnemyUI(g2d, enemy);
         }
         if (heroImage != null) g2d.drawImage(heroImage, heroX, heroY, UNIT_SIZE, UNIT_SIZE, null);
@@ -663,7 +689,7 @@ class DonkeyGamePanel extends JPanel implements Runnable {
     
     private void drawEnemyUI(Graphics2D g2d, Enemy enemy) {
         final int barWidth = 40, barHeight = 7, yOffset = 15;
-        int barX = enemy.x + (UNIT_SIZE / 2) - (barWidth / 2);
+        int barX = enemy.x + (enemy.size / 2) - (barWidth / 2);
         int barY = enemy.y - yOffset;
 
         g2d.setColor(Color.WHITE);
@@ -823,13 +849,16 @@ class DonkeyGamePanel extends JPanel implements Runnable {
     
     public static class Enemy implements Serializable {
         private static final long serialVersionUID = 1L;
-        int x, y, level, currentHealth, maxHealth;
+        int x, y, level, currentHealth, maxHealth, size;
+        private transient BufferedImage image;
 
         private transient DonkeyGamePanel panel;
 
         Enemy(DonkeyGamePanel panel) {
             this.panel = panel;
             this.level = 0;
+            this.size = UNIT_SIZE;
+            this.image = panel.enemyImage;
             respawn();
         }
 
@@ -872,9 +901,9 @@ class DonkeyGamePanel extends JPanel implements Runnable {
                 }
                 } while (
                     (nextX == this.x && nextY == this.y) || // Don't teleport to the same spot
-                    panel.isObstacle(nextX, nextY) || // Don't land on an obstacle
-                    nextX < UNIT_SIZE || nextX >= WORLD_WIDTH - UNIT_SIZE || // Don't go out of bounds. They won't spawn on the edges.
-                    nextY < UNIT_SIZE || nextY >= WORLD_HEIGHT - UNIT_SIZE // Don't go out of bounds. They won't spawn on the edges.
+                    panel.isAreaOccupied(nextX, nextY, this.size) || // Don't land on an obstacle
+                    nextX < 0 || nextX + this.size > WORLD_WIDTH || // Don't go out of bounds.
+                    nextY < 0 || nextY + this.size > WORLD_HEIGHT // Don't go out of bounds.
                 );
 
                 // A valid nearby spot was found, so update the enemy's position
@@ -884,14 +913,15 @@ class DonkeyGamePanel extends JPanel implements Runnable {
 
         public void teleportAnywhere() {
             int nextX, nextY;
-            // Ensure the enemy spawns at least 1 unit away from the edges
+            Rectangle heroBounds = new Rectangle(panel.heroX, panel.heroY, UNIT_SIZE, UNIT_SIZE);
+            // Ensure the enemy spawns within the world and not on an obstacle or the hero
             do {
-                int validWidthUnits = (WORLD_WIDTH / UNIT_SIZE) - 2;
-                int validHeightUnits = (WORLD_HEIGHT / UNIT_SIZE) - 2;
+                int validWidthUnits = (WORLD_WIDTH - this.size) / UNIT_SIZE;
+                int validHeightUnits = (WORLD_HEIGHT - this.size) / UNIT_SIZE;
 
-                nextX = (panel.random.nextInt(validWidthUnits) + 1) * UNIT_SIZE;
-                nextY = (panel.random.nextInt(validHeightUnits) + 1) * UNIT_SIZE;
-            } while (panel.isObstacle(nextX, nextY) || (nextX == panel.heroX && nextY == panel.heroY));
+                nextX = panel.random.nextInt(validWidthUnits) * UNIT_SIZE;
+                nextY = panel.random.nextInt(validHeightUnits) * UNIT_SIZE;
+            } while (panel.isAreaOccupied(nextX, nextY, this.size) || new Rectangle(nextX, nextY, this.size, this.size).intersects(heroBounds));
 
             this.x = nextX;
             this.y = nextY;
@@ -1006,8 +1036,10 @@ class DonkeyGamePanel extends JPanel implements Runnable {
         // You can create a new Boss class later for unique behavior.
         Enemy boss = new Enemy(this);
         boss.level = 25;
-        boss.maxHealth = 250;
-        boss.currentHealth = 250;
+        boss.maxHealth = 225;
+        boss.currentHealth = 225;
+        boss.size = UNIT_SIZE * 3;
+        boss.image = bossImage;
         // Place it in the center of the world
         boss.x = (WORLD_WIDTH / 2 / UNIT_SIZE) * UNIT_SIZE;
         boss.y = (WORLD_HEIGHT / 2 / UNIT_SIZE) * UNIT_SIZE;

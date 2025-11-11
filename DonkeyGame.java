@@ -72,13 +72,16 @@ public class DonkeyGame extends JFrame {
     }
 
     public void loadGame() {
-    // Start loading asynchronously to avoid freezing the UI. Switch to the game card immediately
-    // so the user sees progress and the loaded state when it completes.
-    gamePanel.loadGameAsync();
-    cardLayout.show(mainPanel, "GAME");
-    this.currentScreen = "GAME";
-    gamePanel.requestFocusInWindow();
+    // gamePanel.loadGame() returns true if the user selects a file, and false if they cancel.
+    if (gamePanel.loadGame()) {
+        // If a file was selected, switch to the game screen.
+        // The loading happens asynchronously in the background.
+        cardLayout.show(mainPanel, "GAME");
+        this.currentScreen = "GAME";
+        gamePanel.requestFocusInWindow();
     }
+    // If the user cancels, do nothing and stay on the title screen.
+}
 
     // New method to handle prompting the user before quitting
     private void promptToSaveOnExit() {
